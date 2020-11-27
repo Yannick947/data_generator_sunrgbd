@@ -4,22 +4,21 @@ import json
 
 from PIL import Image
 
-from sunrgbd_generator.generator import ROOT_DIR_SUNRGBD
-
 
 class Sun_To_MASKRCNN(object):
 
     def __init__(self,
+                 root_sunrgbd,
                  path_to_class_map=None,
                  known_classes_only=False,
                  include_image_size=True):
         
         if known_classes_only is True:
 
-            assert path_to_class_map is not None
-            self.class_map = self.__get_class_map('class_map.json')
+            assert path_to_class_map is not None, 'Need a path to class map if known_classes_only is True.'
+            self.class_map = self.__get_class_map(path_to_class_map)
             self.invalid_class_images = 0
-            self.not_recognized_classes = dict()
+            self.unknown_classes = dict()
 
         self.known_classes_only = known_classes_only
         self.label_dict = {'Generated on': time.time(), 'labels':list()}
@@ -28,6 +27,7 @@ class Sun_To_MASKRCNN(object):
         self.num_classes = 0
         self.include_image_size = include_image_size
         self.num_images_parsed = 0
+        self.root_sunrgbd = root_sunrgbd
 
     def __get_class_map(self, path_to_class_map):
         with open (path_to_class_map) as f:
@@ -57,7 +57,6 @@ class Sun_To_MASKRCNN(object):
             
             # if anything went wrong, delete this label
             del self.label_dict['labels'][-1]
-
             raise Exception(e) 
         
         finally: 
@@ -70,25 +69,24 @@ class Sun_To_MASKRCNN(object):
         frames = single_label['frames'][0]['polygon']
         classes = single_label['objects']
 
-        self.label_dict['labels'][-1] = {'path_to_image': path_to_image[len(ROOT_DIR_SUNRGBD):], 
+        self.label_dict['labels'][-1] = {'path_to_image': path_to_image[len(self.root_sunrgbd):], 
                                          'image_name': image_name, 
                                          'regions':list(),
                                          'classes':list(),
                                          'id':self.label_id}
 
         for frame in frames:
-            class_of_object = classes[frame['object']]['name'].lower().strip()
-            if class_of_object == 'wall1' or class_of_object == 'Wall1':
-                print(frame)
+            class_of_object = classes[frame['object']]['name']
 
-            if self.known_classes_only and class_of_object not in self.class_map.keys():
-                # Invalid class detected, don't continue with this image
+            if self.known_classes_only and\
+              (self.class_map.get(class_of_object) is None or self.class_map[class_of_object] == 'unknown'):
+                # Invalid class detected, don't continue with this instance
                 self.invalid_class_images += 1
                 
-                if class_of_object not in self.not_recognized_classes.keys():
-                    self.not_recognized_classes[class_of_object] = 0
+                if class_of_object not in self.unknown_classes.keys():
+                    self.unknown_classes[class_of_object] = 0
                 else: 
-                    self.not_recognized_classes[class_of_object] += 1
+                    self.unknown_classes[class_of_object] += 1
 
                 continue
 
@@ -100,10 +98,13 @@ class Sun_To_MASKRCNN(object):
                 self.detected_classes[class_of_object] = self.num_classes
                 self.num_classes += 1
 
-            self.label_dict['labels'][-1]['classes'].append(class_of_object)
+            if self.known_classes_only is True: 
+                self.label_dict['labels'][-1]['classes'].append(self.class_map[class_of_object])
+            else:
+                self.label_dict['labels'][-1]['classes'].append(class_of_object)
 
         if len(self.label_dict['labels'][-1]['classes']) == 0:
-            raise ValueError('Found image with only unkown classes, skip this one.')
+            raise ValueError('Found image with only unknown classes, skip this one.')
 
     def save_labels(self, save_path='./via_regions.json'):
 
@@ -120,10 +121,10 @@ class Sun_To_MASKRCNN(object):
         print(f'{self.label_id} images succesfully parsed.')
 
         if self.known_classes_only is True:
-            print(f'Detected {self.invalid_class_images} images with invalid labels.')
+            print(f'Detected {self.invalid_class_images} instances with invalid labels.')
         else: 
             print(f'During parsing {len(self.detected_classes.keys())} classes were detected.')
 
-        most_unkown_classes = dict((k, v) for k, v in self.not_recognized_classes.items() if v >= 20)
+        most_unkown_classes = dict((k, v) for k, v in self.unknown_classes.items() if v >= 20)
 
         print('Dict with most unknown classes: ', most_unkown_classes)

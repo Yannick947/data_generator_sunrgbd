@@ -2,39 +2,40 @@ import json
 
 from spellchecker import SpellChecker
 
-CLASSES_PATH = 'C:/Users/Yannick/Google Drive/instance_segmentation/data_generator_sunrgbd/class_map_detected_full.json'
+CLASSES_PATH = 'C:/Users/Yannick/Google Drive/instance_segmentation/data_generator_sunrgbd/sunrgbd_generator/class_map_detected_full.json'
 
 def main():
 
     spell = SpellChecker()
     with open(CLASSES_PATH, 'r') as f:
-        classes = list(json.load(f).keys())
+        class_map = json.load(f)
 
-    print('Number of initial classes: ', len(set(classes)))
-    # Remove chars which are not letters
-    cleaned_words = list()    
-    for word in classes:
-        cleaned_words.append(''.join(e for e in word.lower() if e.isalpha()))
+    print('Number of initial classes: ', len(class_map.keys()))
+    # Remove numbers
+    for word in class_map.keys():
+        is_alpha_word = ''.join(e for e in word.lower() if not e.isdigit())
+        class_map[word] = is_alpha_word
 
+    print(len(set(class_map.values())), ' number of classes remaining after removing special chars and numbers.')
     # find those words that may be misspelled
-    misspelled = spell.unknown(cleaned_words)
+    misspelled = spell.unknown(list(class_map.values()))
 
-    for i, bad_word in enumerate(list(misspelled)):
-        # Get the one `most likely` answer
-        correction = spell.correction(bad_word)
-        if correction != bad_word: 
-            cleaned_words.remove(bad_word)
-            cleaned_words.append(correction)
+    for i, word in enumerate(list(class_map.keys())):
+        cleaned_word = class_map[word]
+
+        # Update the class mapping if the cleaned word is misspelled according to SpellChecker
+        if cleaned_word in misspelled:
+            # Get the one `most likely` answer 
+            correction = spell.correction(cleaned_word)
+            class_map[word] = correction
         
-        if i % 100 == 0:
+        if i % 500 == 0 and i != 0:
             print(i)
             
-    print('Number of words in classes dict ', len(set(cleaned_words)))
-    save_dict = {'classes': cleaned_words}
-
     with open('cleaned_classes.json', 'w') as f:
-        json.dump(save_dict, f, indent=4)
+        json.dump(class_map, f, indent=4)
 
+    print(len(set(class_map.values())), ' number of classes remaining after removing spelling errors according to SpellChecker.')
 
 if __name__ == '__main__':
     main()

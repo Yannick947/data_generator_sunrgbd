@@ -5,12 +5,15 @@ from sunrgbd_generator.sunrgbd_to_maskrcnn import Sun_To_MASKRCNN
 
 # Make sure that last character is slash ('/')
 ROOT_DIR_SUNRGBD = 'C:/Users/Yannick/Downloads/SUNRGBD/'
-PATH_CLASS_MAP = os.path.join(ROOT_DIR_SUNRGBD, )
+ROOT_SAVE_PATH_LABELS = 'C:/Users/Yannick/Google Drive/instance_segmentation/data_generator_sunrgbd'
+PATH_CLASS_MAP = os.path.join(ROOT_SAVE_PATH_LABELS, 'class_dimension_reduction', 'class_map_cleaned.json')
 
 
 def main():
-    label_transformer = Sun_To_MASKRCNN(os.path.join(ROOT_DIR_SUNRGBD, 'seg37list.mat'), 
-                                        known_classes_only=True)
+    label_transformer = Sun_To_MASKRCNN(path_to_class_map=PATH_CLASS_MAP, 
+                                        known_classes_only=True, 
+                                        include_image_size=True, 
+                                        root_sunrgbd=ROOT_DIR_SUNRGBD)
     number_of_errors = 0
 
     for dirpath, _, filenames in os.walk(ROOT_DIR_SUNRGBD):
