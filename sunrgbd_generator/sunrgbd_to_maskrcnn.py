@@ -21,7 +21,7 @@ class Sun_To_MASKRCNN(object):
             self.unknown_classes = dict()
 
         self.known_classes_only = known_classes_only
-        self.label_dict = {'Generated on': time.time(), 'labels':list()}
+        self.label_dict = {'Generated on': time.time(), 'labels':dict()}
         self.label_id = 0
         self.detected_classes = dict()
         self.num_classes = 0
@@ -38,12 +38,13 @@ class Sun_To_MASKRCNN(object):
         with Image.open(path_to_image) as img:
             width, height = img.size
 
-        self.label_dict['labels'][-1]['image_width'] = width
-        self.label_dict['labels'][-1]['image_height'] = height
+        self.label_dict['labels'][self.label_id]['image_width'] = width
+        self.label_dict['labels'][self.label_id]['image_height'] = height
 
     def process_label(self, *kwargs):
 
-        self.label_dict['labels'].append(dict())
+        
+        self.label_dict['labels'][self.label_id] = dict()
 
         try:
             self.add_label(*kwargs)
@@ -56,7 +57,7 @@ class Sun_To_MASKRCNN(object):
         except Exception as e:
             
             # if anything went wrong, delete this label
-            del self.label_dict['labels'][-1]
+            self.label_dict['labels'].pop(self.label_id, None)
             raise Exception(e) 
         
         finally: 
@@ -69,11 +70,13 @@ class Sun_To_MASKRCNN(object):
         frames = single_label['frames'][0]['polygon']
         classes = single_label['objects']
 
-        self.label_dict['labels'][-1] = {'path_to_image': path_to_image[len(self.root_sunrgbd):], 
-                                         'image_name': image_name, 
-                                         'regions':list(),
-                                         'classes':list(),
-                                         'id':self.label_id}
+        path_to_image_generic = path_to_image[len(self.root_sunrgbd):].replace('\\', '/')
+
+        self.label_dict['labels'][self.label_id] = {'path_to_image': path_to_image_generic, 
+                                                    'image_name': image_name, 
+                                                    'regions':list(),
+                                                    'classes':list(),
+                                                    'id':self.label_id}
 
         for frame in frames:
             class_of_object = classes[frame['object']]['name']
@@ -90,20 +93,20 @@ class Sun_To_MASKRCNN(object):
 
                 continue
 
-            self.label_dict['labels'][-1]['regions'].append({"name": "polygon", 
-                                                             "all_points_x":frame['x'], 
-                                                             "all_points_y":frame['y']})
+            self.label_dict['labels'][self.label_id]['regions'].append({"name": "polygon", 
+                                                                        "all_points_x":frame['x'], 
+                                                                        "all_points_y":frame['y']})
 
             if not bool(self.detected_classes.keys()) or class_of_object not in self.detected_classes.keys(): 
                 self.detected_classes[class_of_object] = self.num_classes
                 self.num_classes += 1
 
             if self.known_classes_only is True: 
-                self.label_dict['labels'][-1]['classes'].append(self.class_map[class_of_object])
+                self.label_dict['labels'][self.label_id]['classes'].append(self.class_map[class_of_object])
             else:
-                self.label_dict['labels'][-1]['classes'].append(class_of_object)
+                self.label_dict['labels'][self.label_id]['classes'].append(class_of_object)
 
-        if len(self.label_dict['labels'][-1]['classes']) == 0:
+        if len(self.label_dict['labels'][self.label_id]['classes']) == 0:
             raise ValueError('Found image with only unknown classes, skip this one.')
 
     def save_labels(self, save_path='./via_regions.json'):

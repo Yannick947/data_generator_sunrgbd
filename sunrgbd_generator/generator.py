@@ -21,9 +21,9 @@ def main():
             if  ('.jpg' in filename) or ('.png' in filename):
                 image_filepath = os.path.join(dirpath, filename)
                 if 'image' in image_filepath:
+                    # TODO: Fix for using in unix
                     upper_dirname = dirpath[:dirpath.find('\\image')]
 
-                    # specific transformations to get instance segmentation for maskrcnn
                     label_filepath = os.path.join(upper_dirname, 'annotation2Dfinal', 'index.json')
 
                     try: 
