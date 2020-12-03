@@ -4,6 +4,11 @@ import json
 
 from PIL import Image
 
+# Manually found mismatches between mapped classes
+IGNORE_CLASSES = ['patio', 'headboard', 'kitchen', 'floor', 'toilet', 'tub', 'cottage', 'shower', 'bathroom',
+                  'house', 'bath', 'room', 'pants', 'jeans', "outfit", 'furniture', 'pillow', 'bathtub', 'fireplace',
+                  'Curtins']
+
 
 class Sun_To_MASKRCNN(object):
 
@@ -12,7 +17,13 @@ class Sun_To_MASKRCNN(object):
                  path_to_class_map=None,
                  known_classes_only=False,
                  include_image_size=True):
-        
+        """ Class to transform an annotation file from sunrgbd style into mask_rcnn format. Applies some custom transformtaions
+        Arguments: 
+            :param root_sunrgbd: Path to root of sunrgbd dataset
+            :param path_to_class_map: Path to the previously extracted class map with the dimension_reduction utilities
+            :param known_classes_only: If classes which were previously matched only shall be considered or all classes
+            :param include_image_size: If image size shall be stored in the annotations file
+        """
         if known_classes_only is True:
 
             assert path_to_class_map is not None, 'Need a path to class map if known_classes_only is True.'
@@ -28,6 +39,7 @@ class Sun_To_MASKRCNN(object):
         self.include_image_size = include_image_size
         self.num_images_parsed = 0
         self.root_sunrgbd = root_sunrgbd
+        self.ignore_map = self.get_ignore_map()
 
     def __get_class_map(self, path_to_class_map):
         with open (path_to_class_map) as f:
@@ -81,16 +93,7 @@ class Sun_To_MASKRCNN(object):
         for frame in frames:
             class_of_object = classes[frame['object']]['name']
 
-            if self.known_classes_only and\
-              (self.class_map.get(class_of_object) is None or self.class_map[class_of_object] == 'unknown'):
-                # Invalid class detected, don't continue with this instance
-                self.invalid_class_images += 1
-                
-                if class_of_object not in self.unknown_classes.keys():
-                    self.unknown_classes[class_of_object] = 0
-                else: 
-                    self.unknown_classes[class_of_object] += 1
-
+            if not self.valid_frame(class_of_object, frame):
                 continue
 
             self.label_dict['labels'][self.label_id]['regions'].append({"name": "polygon", 
@@ -108,6 +111,27 @@ class Sun_To_MASKRCNN(object):
 
         if len(self.label_dict['labels'][self.label_id]['classes']) == 0:
             raise ValueError('Found image with only unknown classes, skip this one.')
+    
+    def valid_frame(self, class_of_object, frame):
+        if self.known_classes_only and\
+           (self.class_map.get(class_of_object) is None or\
+           self.class_map.get(class_of_object) == 'unknown') or\
+           self.ignore_map.get(class_of_object) is True:
+           # Invalid class detected, don't continue with this instance
+            self.invalid_class_images += 1
+                
+            if class_of_object not in self.unknown_classes.keys():
+                self.unknown_classes[class_of_object] = 0
+            else: 
+                self.unknown_classes[class_of_object] += 1
+
+            return False
+            
+        if len(frame['x']) < 3 or (len(frame['x']) != len(frame['y'])):
+            #invalid polygon encountered, continue
+            return False
+        
+        return True
 
     def save_labels(self, save_path='./via_regions.json'):
 
@@ -131,3 +155,20 @@ class Sun_To_MASKRCNN(object):
         most_unkown_classes = dict((k, v) for k, v in self.unknown_classes.items() if v >= 20)
 
         print('Dict with most unknown classes: ', most_unkown_classes)
+
+    def get_ignore_map(self):
+        ignore_map = dict()
+        try: 
+            with open(os.path.join(self.root_sunrgbd, 'class_dimension_reduction', 'cleaned_classes.json'), 'r') as f:
+                cleaned_classes = json.load(f)
+        except FileNotFoundError:
+            print('cleaned_classes.json not found, if you want to apply manually inserted IGNORE_CLASSES provide the file.')
+            return ignore_map
+
+        for key, value in cleaned_classes.items():
+            if value in IGNORE_CLASSES:
+                ignore_map[key] = True
+            else: 
+                ignore_map[key] = False
+
+        return ignore_map

@@ -60,7 +60,7 @@ def main():
     for key in classes_count.keys():
         print(f'Number of labels assigned to the class {key} is {classes_count[key]}.')
 
-    with open('./class_dimension_reduction/class_map_cleaned.json', 'w') as f:
+    with open('class_map_cleaned.json', 'w') as f:
         json.dump(class_map, f, indent=4)
 
 
