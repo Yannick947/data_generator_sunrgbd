@@ -8,6 +8,7 @@ from PIL import Image
 IGNORE_CLASSES = ['patio', 'headboard', 'kitchen', 'floor', 'toilet', 'tub', 'cottage', 'shower', 'bathroom',
                   'house', 'bath', 'room', 'pants', 'jeans', "outfit", 'furniture', 'pillow', 'bathtub', 'fireplace',
                   'Curtins']
+ROOT = 'C:/Users/Yannick/Google Drive/instance_segmentation/data_generator_sunrgbd/'
 
 
 class Sun_To_MASKRCNN(object):
@@ -159,7 +160,7 @@ class Sun_To_MASKRCNN(object):
     def get_ignore_map(self):
         ignore_map = dict()
         try: 
-            with open(os.path.join(self.root_sunrgbd, 'class_dimension_reduction', 'cleaned_classes.json'), 'r') as f:
+            with open(os.path.join(ROOT, 'class_dimension_reduction', 'cleaned_classes.json'), 'r') as f:
                 cleaned_classes = json.load(f)
         except FileNotFoundError:
             print('cleaned_classes.json not found, if you want to apply manually inserted IGNORE_CLASSES provide the file.')
